@@ -193,6 +193,6 @@ class Accessibility extends FRGatherer {
     return runAxe(...args);
   }
 }
-
+Accessibility.runAxe = runAxe;
 module.exports = Accessibility;
 

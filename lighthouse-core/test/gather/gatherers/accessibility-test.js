@@ -33,39 +33,32 @@ describe('Accessibility gatherer', () => {
   });
 });
 
-describe('axe-run', () => {
-  /**
-   * @jest-environment jsdom
-   */
-  const fs = require('fs');
-  const jsdom = require('jsdom');
+describe.only('axe-run', () => {
+  let browser;
+  const axeLibSource = require('../../../lib/axe.js').source;
   const pageFunctions = require('../../../lib/page-functions.js');
+  const fs = require('fs');
 
-  const jdomObj = new jsdom.JSDOM(`<!doctype html><meta charset="utf8"><title>hi</title>valid.`);
-  let axe;
-
-  beforeAll(() =>{
-    // Needed by axe-core
-    // https://github.com/dequelabs/axe-core/blob/581c441c/doc/examples/jsdom/test/a11y.js#L24
-    global.window = global.self = jdomObj.window;
-    global.document = jdomObj.window.document;
-    global.getNodeDetails = pageFunctions.getNodeDetails;
-
-    // axe-core must be required after the global polyfills
-    axe = require('axe-core'); // eslint-disable-line no-unused-vars
+  beforeAll(async () => {
+    browser = await require('puppeteer').launch();
   });
 
-  afterAll(() => {
-    global.window = undefined;
-    global.document = undefined;
-    global.getNodeDetails = undefined;
+  afterAll(async () => {
+    await browser.close();
   });
 
   it('tests only the checks we have audits defined for', async () => {
+    const page = await browser.newPage();
+    page.setContent(`<!doctype html><meta charset="utf8"><title>hi</title>valid.`);
+    await page.evaluate(axeLibSource);
+    await page.evaluate(pageFunctions.getNodeDetailsString);
+
+    await page.evaluate(AccessibilityGather.runAxe.toString());
+    // 1. Run axe in the browser.
+    const axeResults = await page.evaluate(`
     // The color-contrast rule is manually disabled as jsdom doesn't support the APIs needed. https://github.com/dequelabs/axe-core/blob/581c441c/doc/examples/jsdom/test/a11y.js#L40
-    const axeResults = await AccessibilityGather.runAxeForTest(undefined, {
-      colorContrastEnabled: false,
-    });
+      runAxe(undefined, {colorContrastEnabled: false})
+    `);
 
     const axeRuleIds = new Set();
     for (const type of ['violations', 'incomplete', 'inapplicable', 'passes']) {
@@ -74,11 +67,13 @@ describe('axe-run', () => {
     axeRuleIds.add('color-contrast');
     const axeRuleIdsArr = Array.from(axeRuleIds).sort();
 
+    // 2. Get audit list we have implementations for
     // Note: audit ids match their filenames, thx to the getAuditList test in runner-test.js
     const filenames = fs.readdirSync(__dirname + '/../../../audits/accessibility/')
         .map(f => f.replace('.js', '')).filter(f => f !== 'axe-audit' && f !== 'manual')
         .sort();
 
+    // 3. Compare
     expect(axeRuleIdsArr).toEqual(filenames);
   });
 });
