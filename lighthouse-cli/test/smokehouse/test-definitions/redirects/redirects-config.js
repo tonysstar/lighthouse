@@ -8,7 +8,9 @@
 /**
  * Config file for running PWA smokehouse audits.
  */
-module.exports = {
+
+/** @type {LH.Config.Json} */
+const config = {
   extends: 'lighthouse:default',
   settings: {
     onlyAudits: [
@@ -18,6 +20,8 @@ module.exports = {
       'redirects',
     ],
     // Use provided throttling method to test usage of correct navStart.
-    throttlingMethod: /** @type {'provided'} */ ('provided'),
+    throttlingMethod: /** @type {const} */ ('provided'),
   },
 };
+
+export default config;

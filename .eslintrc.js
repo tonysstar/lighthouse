@@ -6,10 +6,15 @@
 'use strict';
 
 module.exports = {
+  // All subdirectory eslintrcs extend from this one.
+  root: true,
   // start with google standard style
   //     https://github.com/google/eslint-config-google/blob/master/index.js
   extends: ['eslint:recommended', 'google'],
-  plugins: ['eslint-plugin-local-rules'], // include custom rules
+  plugins: [
+    'eslint-plugin-local-rules',
+    'eslint-plugin-import',
+  ],
   env: {
     node: true,
     es6: true,
@@ -60,8 +65,8 @@ module.exports = {
     'comma-dangle': [2, {
       arrays: 'always-multiline',
       objects: 'always-multiline',
-      imports: 'never',
-      exports: 'never',
+      imports: 'always-multiline',
+      exports: 'always-multiline',
       functions: 'never',
     }],
 
@@ -83,7 +88,7 @@ module.exports = {
   ],
   parser: '@typescript-eslint/parser',
   parserOptions: {
-    ecmaVersion: 2019,
+    ecmaVersion: 2020,
     ecmaFeatures: {
       globalReturn: true,
       jsx: false,
