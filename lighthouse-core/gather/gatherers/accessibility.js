@@ -12,12 +12,10 @@ const axeLibSource = require('../../lib/axe.js').source;
 const pageFunctions = require('../../lib/page-functions.js');
 
 /**
- * @param {Array<import('axe-core/axe').resultGroups>} resultTypes
- * @param {{colorContrastEnabled: boolean}} opts
- * @return {Promise<import('axe-core/axe').AxeResults>}
+ * @return {Promise<LH.Artifacts.Accessibility>}
  */
 /* c8 ignore start */
-async function runAxe(resultTypes, opts = {colorContrastEnabled: true}) {
+async function runA11yChecks() {
   /** @type {import('axe-core/axe')} */
   // @ts-expect-error - axe defined by axeLibSource
   const axe = window.axe;
@@ -37,7 +35,9 @@ async function runAxe(resultTypes, opts = {colorContrastEnabled: true}) {
         'wcag2aa',
       ],
     },
-    resultTypes,
+    // resultTypes doesn't limit the output of the axeResults object. Instead, if it's defined,
+    // some expensive element identification is done only for the respective types. https://github.com/dequelabs/axe-core/blob/f62f0cf18f7b69b247b0b6362cf1ae71ffbf3a1b/lib/core/reporters/helpers/process-aggregate.js#L61-L97
+    resultTypes: ['violations', 'inapplicable'],
     rules: {
       // Consider http://go/prcpg for expert review of the aXe rules.
       'tabindex': {enabled: true},
@@ -60,7 +60,6 @@ async function runAxe(resultTypes, opts = {colorContrastEnabled: true}) {
       // https://github.com/dequelabs/axe-core/issues/2958
       'nested-interactive': {enabled: false},
       'frame-focusable-content': {enabled: false},
-      'color-contrast': {enabled: opts.colorContrastEnabled}, // See gatherer's test for explanation
       'aria-roledescription': {enabled: false},
       'scrollable-region-focusable': {enabled: false},
       // TODO(paulirish): create audits and enable these 3.
@@ -70,17 +69,6 @@ async function runAxe(resultTypes, opts = {colorContrastEnabled: true}) {
     },
   });
 
-
-  return axeResults;
-}
-
-/**
- * Run aXe and adjust results for Lighthouse consumption
- * @return {Promise<LH.Artifacts.Accessibility>}
- */
-async function runA11yChecks() {
-  const axeResults = await runAxe(['violations', 'inapplicable']);
-
   // axe just scrolled the page, scroll back to the top of the page so that element positions
   // are relative to the top of the page
   document.documentElement.scrollTop = 0;
@@ -88,7 +76,8 @@ async function runA11yChecks() {
   return {
     violations: axeResults.violations.map(createAxeRuleResultArtifact),
     incomplete: axeResults.incomplete.map(createAxeRuleResultArtifact),
-    notApplicable: axeResults.inapplicable.map(result => ({id: result.id})),
+    notApplicable: axeResults.inapplicable.map(result => ({id: result.id})), // FYI: inapplicable => notApplicable!
+    passes: axeResults.passes.map(result => ({id: result.id})),
     version: axeResults.testEngine.version,
   };
 }
@@ -182,17 +171,11 @@ class Accessibility extends FRGatherer {
         axeLibSource,
         pageFunctions.getNodeDetailsString,
         createAxeRuleResultArtifact,
-        runAxe,
       ],
     });
   }
-
-  // @ts-expect-error just sending 'em right through…
-  static runAxeForTest(...args) {
-    // @ts-expect-error
-    return runAxe(...args);
-  }
 }
-Accessibility.runAxe = runAxe;
+Accessibility.runA11yChecks = runA11yChecks;
+Accessibility.createAxeRuleResultArtifact = createAxeRuleResultArtifact;
 module.exports = Accessibility;
 

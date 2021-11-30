@@ -34,7 +34,7 @@ describe('Accessibility gatherer', () => {
   });
 });
 
-describe('axe-run', () => {
+describe('a11y audits + aXe', () => {
   let browser;
   const axeLibSource = require('../../../lib/axe.js').source;
   const pageFunctions = require('../../../lib/page-functions.js');
@@ -48,33 +48,29 @@ describe('axe-run', () => {
     await browser.close();
   });
 
-  it('tests only the checks we have audits defined for', async () => {
+  it('only runs the axe rules we have audits defined for', async () => {
     const page = await browser.newPage();
     page.setContent(`<!doctype html><meta charset="utf8"><title>hi</title>valid.`);
     await page.evaluate(axeLibSource);
     await page.evaluate(pageFunctions.getNodeDetailsString);
+    await page.evaluate(AccessibilityGather.runA11yChecks.toString());
+    await page.evaluate(AccessibilityGather.createAxeRuleResultArtifact.toString());
 
-    await page.evaluate(AccessibilityGather.runAxe.toString());
     // 1. Run axe in the browser.
-    const axeResults = await page.evaluate(`
-    // The color-contrast rule is manually disabled as jsdom doesn't support the APIs needed. https://github.com/dequelabs/axe-core/blob/581c441c/doc/examples/jsdom/test/a11y.js#L40
-      runAxe(undefined, {colorContrastEnabled: false})
-    `);
-
+    const a11yArtifact = await page.evaluate(`runA11yChecks()`);
+    // 2. Get list of the axe rules that ran.
     const axeRuleIds = new Set();
-    for (const type of ['violations', 'incomplete', 'inapplicable', 'passes']) {
-      if (axeResults[type]) axeResults[type].forEach(result => axeRuleIds.add(result.id));
+    for (const key of ['violations', 'incomplete', 'notApplicable', 'passes']) {
+      if (a11yArtifact[key]) a11yArtifact[key].forEach(result => axeRuleIds.add(result.id));
     }
-    axeRuleIds.add('color-contrast');
-    const axeRuleIdsArr = Array.from(axeRuleIds).sort();
 
-    // 2. Get audit list we have implementations for
+    // 3. Get audit list we have implementations for.
     // Note: audit ids match their filenames, thx to the getAuditList test in runner-test.js
     const filenames = fs.readdirSync(`${LH_ROOT}/lighthouse-core/audits/accessibility/`)
-        .map(f => f.replace('.js', '')).filter(f => f !== 'axe-audit' && f !== 'manual')
-        .sort();
+        .map(f => f.replace('.js', ''))
+        .filter(f => f !== 'axe-audit' && f !== 'manual');
 
-    // 3. Compare
-    expect(axeRuleIdsArr).toEqual(filenames);
+    // 4. Compare. (Received from aXe, Expected is LH audits)
+    expect(Array.from(axeRuleIds).sort()).toEqual(filenames.sort());
   });
 });
