@@ -9,9 +9,10 @@
 
 const AccessibilityGather = require('../../../gather/gatherers/accessibility.js');
 const assert = require('assert').strict;
-let accessibilityGather;
+const {LH_ROOT} = require('../../../../root.js');
 
 describe('Accessibility gatherer', () => {
+  let accessibilityGather;
   // Reset the Gatherer before each test.
   beforeEach(() => {
     accessibilityGather = new AccessibilityGather();
@@ -33,7 +34,7 @@ describe('Accessibility gatherer', () => {
   });
 });
 
-describe.only('axe-run', () => {
+describe('axe-run', () => {
   let browser;
   const axeLibSource = require('../../../lib/axe.js').source;
   const pageFunctions = require('../../../lib/page-functions.js');
@@ -69,7 +70,7 @@ describe.only('axe-run', () => {
 
     // 2. Get audit list we have implementations for
     // Note: audit ids match their filenames, thx to the getAuditList test in runner-test.js
-    const filenames = fs.readdirSync(__dirname + '/../../../audits/accessibility/')
+    const filenames = fs.readdirSync(`${LH_ROOT}/lighthouse-core/audits/accessibility/`)
         .map(f => f.replace('.js', '')).filter(f => f !== 'axe-audit' && f !== 'manual')
         .sort();
 
