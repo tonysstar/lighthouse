@@ -157,6 +157,11 @@ class Accessibility extends FRGatherer {
     supportedModes: ['snapshot', 'navigation'],
   }
 
+  static pageFns = {
+    runA11yChecks,
+    createAxeRuleResultArtifact,
+  }
+
   /**
    * @param {LH.Gatherer.FRTransitionalContext} passContext
    * @return {Promise<LH.Artifacts.Accessibility>}
@@ -175,7 +180,5 @@ class Accessibility extends FRGatherer {
     });
   }
 }
-Accessibility.runA11yChecks = runA11yChecks;
-Accessibility.createAxeRuleResultArtifact = createAxeRuleResultArtifact;
-module.exports = Accessibility;
 
+module.exports = Accessibility;

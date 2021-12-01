@@ -53,8 +53,8 @@ describe('a11y audits + aXe', () => {
     page.setContent(`<!doctype html><meta charset="utf8"><title>hi</title>valid.`);
     await page.evaluate(axeLibSource);
     await page.evaluate(pageFunctions.getNodeDetailsString);
-    await page.evaluate(AccessibilityGather.runA11yChecks.toString());
-    await page.evaluate(AccessibilityGather.createAxeRuleResultArtifact.toString());
+    await page.evaluate(AccessibilityGather.pageFns.runA11yChecks.toString());
+    await page.evaluate(AccessibilityGather.pageFns.createAxeRuleResultArtifact.toString());
 
     // 1. Run axe in the browser.
     const a11yArtifact = await page.evaluate(`runA11yChecks()`);
