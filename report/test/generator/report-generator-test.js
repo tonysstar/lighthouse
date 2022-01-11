@@ -5,6 +5,8 @@
  */
 'use strict';
 
+/* eslint-disable no-irregular-whitespace */
+
 const assert = require('assert').strict;
 const fs = require('fs');
 
