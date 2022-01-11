@@ -93,8 +93,11 @@ class ReportGenerator {
     const separator = ',';
     /** @param {string} value @return {string} */
     const escape = value => `"${value.replace(/"/g, '""')}"`;
-    /** @param {ReadonlyArray<string | number>} row @return {string[]} */
-    const rowFormatter = row => row.map(value => value.toString()).map(escape);
+    /** @param {ReadonlyArray<string | number | null>} row @return {string[]} */
+    const rowFormatter = row => row.map(value => {
+      if (value === null) return 'null';
+      return value.toString();
+    }).map(escape);
 
     const rows = [];
     const topLevelKeys = /** @type {const} */(
@@ -110,7 +113,10 @@ class ReportGenerator {
     // Categories.
     rows.push(['category', 'score']);
     for (const category of Object.values(lhr.categories)) {
-      rows.push(rowFormatter([category.id, category.score || 'null']));
+      rows.push(rowFormatter([
+        category.id,
+        category.score,
+      ]));
     }
 
     rows.push([]);
@@ -125,10 +131,7 @@ class ReportGenerator {
         rows.push(rowFormatter([
           category.id,
           auditRef.id,
-          // TODO ?
-          // // CSV validator wants all scores to be numeric, use -1 for now
-          // const numericScore = audit.score === null ? -1 : audit.score;
-          audit.score || 'null',
+          audit.score,
           audit.displayValue || '',
           audit.description,
         ]));

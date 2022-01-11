@@ -83,13 +83,6 @@ describe('ReportGenerator', () => {
 
     it('creates CSV for results', async () => {
       const path = './.results-as-csv.csv';
-      const headers = {
-        category: '',
-        name: '',
-        title: '',
-        type: '',
-        score: 42,
-      };
 
       const csvOutput = ReportGenerator.generateReport(sampleResults, 'csv');
       fs.writeFileSync(path, csvOutput);
@@ -116,7 +109,7 @@ category,audit,score,displayValue,description
 `);
 
       try {
-        await csvValidator(path, headers);
+        await csvValidator(path);
       } catch (err) {
         assert.fail('CSV parser error:\n' + err.join('\n'));
       } finally {
