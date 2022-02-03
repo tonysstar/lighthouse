@@ -7,7 +7,6 @@
 
 const Audit = require('./audit.js');
 const i18n = require('../lib/i18n/i18n.js');
-const ManifestValues = require('../computed/manifest-values.js');
 
 /* eslint-disable max-len */
 const UIStrings = {
@@ -125,7 +124,7 @@ class InstallableManifest extends Audit {
       failureTitle: str_(UIStrings.failureTitle),
       description: str_(UIStrings.description),
       supportedModes: ['navigation'],
-      requiredArtifacts: ['URL', 'WebAppManifest', 'InstallabilityErrors'],
+      requiredArtifacts: ['WebAppManifest', 'InstallabilityErrors'],
     };
   }
 
@@ -190,12 +189,10 @@ class InstallableManifest extends Audit {
 
   /**
    * @param {LH.Artifacts} artifacts
-   * @param {LH.Audit.Context} context
    * @return {Promise<LH.Audit.Product>}
    *
    */
-  static async audit(artifacts, context) {
-    const manifestValues = await ManifestValues.request(artifacts, context);
+  static async audit(artifacts) {
     const {i18nErrors, warnings} = InstallableManifest.getInstallabilityErrors(artifacts);
 
     const manifestUrl = artifacts.WebAppManifest ? artifacts.WebAppManifest.url : null;
@@ -210,11 +207,6 @@ class InstallableManifest extends Audit {
     const errorReasons = i18nErrors.map(reason => {
       return {reason};
     });
-    /** DevTools InstallabilityErrors does not emit an error unless there is a manifest, so include manifestValues's error */
-    if (manifestValues.isParseFailure) {
-      errorReasons.push({
-        reason: manifestValues.parseFailureReason});
-    }
 
     // Include the detailed pass/fail checklist as a diagnostic.
     /** @type {LH.Audit.Details.DebugData} */
