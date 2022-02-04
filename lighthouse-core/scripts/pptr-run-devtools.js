@@ -12,11 +12,11 @@
  *
  * To use with locally built DevTools and Lighthouse, run (assuming devtools at ~/src/devtools/devtools-frontend):
  *    yarn devtools
- *    yarn run-devtools --custom-devtools-frontend=file://$HOME/src/devtools/devtools-frontend/out/Default/gen/front_end
+ *    yarn run-devtools --chrome-flags=--custom-devtools-frontend=file://$HOME/src/devtools/devtools-frontend/out/Default/gen/front_end
  *
  * Or with the DevTools in .tmp:
  *   bash lighthouse-core/test/chromium-web-tests/setup.sh
- *   yarn run-devtools --custom-devtools-frontend=file://$PWD/.tmp/chromium-web-tests/devtools/devtools-frontend/out/Default/gen/front_end
+ *   yarn run-devtools --chrome-flags=--custom-devtools-frontend=file://$PWD/.tmp/chromium-web-tests/devtools/devtools-frontend/out/Default/gen/front_end
  *
  * URL list file: yarn run-devtools < path/to/urls.txt
  * Single URL: yarn run-devtools "https://example.com"
@@ -29,6 +29,8 @@ import {fileURLToPath} from 'url';
 import puppeteer from 'puppeteer';
 import yargs from 'yargs';
 import * as yargsHelpers from 'yargs/helpers';
+
+import {parseChromeFlags} from '../../lighthouse-cli/run.js';
 
 const y = yargs(yargsHelpers.hideBin(process.argv));
 const argv_ = y
@@ -43,6 +45,10 @@ const argv_ = y
   .option('custom-devtools-frontend', {
     type: 'string',
     alias: 'd',
+  })
+  .option('chrome-flags', {
+    type: 'string',
+    default: '',
   })
   .option('config', {
     type: 'string',
@@ -306,7 +312,7 @@ async function run() {
 
   const browser = await puppeteer.launch({
     executablePath: process.env.CHROME_PATH,
-    args: customDevtools ? [`--custom-devtools-frontend=${customDevtools}`] : [],
+    args: parseChromeFlags(argv['chromeFlags']),
     devtools: true,
   });
 
