@@ -42,10 +42,6 @@ const argv_ = y
     default: 'latest-run/devtools-lhrs',
     alias: 'o',
   })
-  .option('custom-devtools-frontend', {
-    type: 'string',
-    alias: 'd',
-  })
   .option('chrome-flags', {
     type: 'string',
     default: '',
@@ -286,6 +282,7 @@ async function readUrlList() {
 }
 
 async function run() {
+  const chromeFlags = parseChromeFlags(argv['chromeFlags']);
   const outputDir = argv['output-dir'];
 
   // Create output directory.
@@ -298,7 +295,9 @@ async function run() {
     fs.mkdirSync(outputDir);
   }
 
-  const customDevtools = argv['custom-devtools-frontend'];
+  const customDevtools = chromeFlags
+    .find(f => f.startsWith('--custom-devtools-frontend='))
+    ?.replace('--custom-devtools-frontend=', '');
   if (customDevtools) {
     console.log(`Using custom devtools frontend: ${customDevtools}`);
     console.log('Make sure it has been built recently!');
@@ -312,7 +311,7 @@ async function run() {
 
   const browser = await puppeteer.launch({
     executablePath: process.env.CHROME_PATH,
-    args: parseChromeFlags(argv['chromeFlags']),
+    args: chromeFlags,
     devtools: true,
   });
 
