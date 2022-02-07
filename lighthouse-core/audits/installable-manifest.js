@@ -216,7 +216,8 @@ class InstallableManifest extends Audit {
       const manifestValues = await ManifestValues.request(artifacts, context);
       if (manifestValues.isParseFailure) {
         errorReasons.push({
-          reason: manifestValues.parseFailureReason});
+          reason: manifestValues.parseFailureReason,
+        });
       }
     }
 
