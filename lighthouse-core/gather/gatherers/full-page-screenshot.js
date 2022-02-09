@@ -8,6 +8,7 @@
 /* globals window document getBoundingClientRect */
 
 const FRGatherer = require('../../fraggle-rock/gather/base-gatherer.js');
+const emulation = require('../../lib/emulation.js');
 const pageFunctions = require('../../lib/page-functions.js');
 
 // JPEG quality setting
@@ -62,11 +63,10 @@ class FullPageScreenshot extends FRGatherer {
 
   /**
    * @param {LH.Gatherer.FRTransitionalContext} context
-   * @param {ReturnType<getObservedDeviceMetrics>} observedDeviceMetrics
-   * @param {boolean} mobile
+   * @param {{height: number, width: number, mobile: boolean}} deviceMetrics
    * @return {Promise<LH.Artifacts.FullPageScreenshot['screenshot']>}
    */
-  async _takeScreenshot(context, observedDeviceMetrics, mobile) {
+  async _takeScreenshot(context, deviceMetrics) {
     const session = context.driver.defaultSession;
     const maxScreenshotHeight = await this.getMaxScreenshotHeight(context);
     const metrics = await session.sendCommand('Page.getLayoutMetrics');
@@ -74,14 +74,14 @@ class FullPageScreenshot extends FRGatherer {
     // Height should be as tall as the content.
     // Scale the emulated height to reach the content height.
     const fullHeight = Math.round(
-      observedDeviceMetrics.height *
+      deviceMetrics.height *
       metrics.contentSize.height /
       metrics.layoutViewport.clientHeight
     );
     const height = Math.min(fullHeight, maxScreenshotHeight);
 
     await session.sendCommand('Emulation.setDeviceMetricsOverride', {
-      mobile,
+      mobile: deviceMetrics.mobile,
       height,
       width: 0, // Don't change
       deviceScaleFactor: 0, // Don't change
@@ -99,7 +99,7 @@ class FullPageScreenshot extends FRGatherer {
 
     return {
       data,
-      width: observedDeviceMetrics.width,
+      width: deviceMetrics.width,
       height,
     };
   }
@@ -157,41 +157,50 @@ class FullPageScreenshot extends FRGatherer {
     const session = context.driver.defaultSession;
     const executionContext = context.driver.executionContext;
     const settings = context.settings;
+    const lighthouseControlsEmulation = !settings.screenEmulation.disabled;
 
-    // In case some other program is controlling emulation, remember what the device looks
-    // like now and reset after gatherer is done.
-    const observedDeviceMetrics = await executionContext.evaluate(getObservedDeviceMetrics, {
-      args: [],
-      useIsolation: true,
-      deps: [kebabCaseToCamelCase],
-    });
-
-    // If we're gathering with mobile screenEmulation on (overlay scrollbars, etc), continue to use that for this screenshot.
-    // If screen emulation is disabled, use formFactor to determine if we are on mobile.
-    let mobile = settings.screenEmulation.mobile;
-    if (settings.screenEmulation.disabled) {
-      mobile = settings.formFactor === 'mobile';
+    /**
+     * In case some other program is controlling emulation, remember what the device looks like now and reset after gatherer is done.
+     * If we're gathering with mobile screenEmulation on (overlay scrollbars, etc), continue to use that for this screenshot.
+     * @type {{width: number, height: number, mobile: boolean}}
+     */
+    const deviceMetrics = settings.screenEmulation;
+    if (!lighthouseControlsEmulation) {
+      const observedDeviceMetrics = await executionContext.evaluate(getObservedDeviceMetrics, {
+        args: [],
+        useIsolation: true,
+        deps: [kebabCaseToCamelCase],
+      });
+      deviceMetrics.height = observedDeviceMetrics.height;
+      deviceMetrics.width = observedDeviceMetrics.width;
+      // If screen emulation is disabled, use formFactor to determine if we are on mobile.
+      deviceMetrics.mobile = settings.formFactor === 'mobile';
     }
 
     try {
       return {
-        screenshot: await this._takeScreenshot(context, observedDeviceMetrics, mobile),
+        screenshot: await this._takeScreenshot(context, deviceMetrics),
         nodes: await this._resolveNodes(context),
       };
     } finally {
-      // Best effort to reset emulation to what it was.
-      // https://github.com/GoogleChrome/lighthouse/pull/10716#discussion_r428970681
-      // TODO: seems like this would be brittle. Should at least work for devtools, but what
-      // about scripted puppeteer usages? Better to introduce a "setEmulation" callback
-      // in the LH runner api, which for ex. puppeteer consumers would setup puppeteer emulation,
-      // and then just call that to reset?
-      // https://github.com/GoogleChrome/lighthouse/issues/11122
-      await session.sendCommand('Emulation.setDeviceMetricsOverride', {
-        mobile,
-        height: observedDeviceMetrics.height,
-        width: 0, // Don't change
-        deviceScaleFactor: 0, // Don't change
-      });
+      // Revert resized page.
+      if (lighthouseControlsEmulation) {
+        await emulation.emulate(session, settings);
+      } else {
+        // Best effort to reset emulation to what it was.
+        // https://github.com/GoogleChrome/lighthouse/pull/10716#discussion_r428970681
+        // TODO: seems like this would be brittle. Should at least work for devtools, but what
+        // about scripted puppeteer usages? Better to introduce a "setEmulation" callback
+        // in the LH runner api, which for ex. puppeteer consumers would setup puppeteer emulation,
+        // and then just call that to reset?
+        // https://github.com/GoogleChrome/lighthouse/issues/11122
+        await session.sendCommand('Emulation.setDeviceMetricsOverride', {
+          mobile: deviceMetrics.mobile,
+          height: deviceMetrics.height,
+          width: 0, // Don't change
+          deviceScaleFactor: 0, // Don't change
+        });
+      }
     }
   }
 }

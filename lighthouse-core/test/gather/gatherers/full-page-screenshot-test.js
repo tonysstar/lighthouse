@@ -23,17 +23,14 @@ let contentSize;
 let screenSize;
 /** @type {string[]} */
 let screenshotData;
-/** @type {Array<{width: number, height: number, deviceScaleFactor: number, mobile: boolean}>} */
-let metricOverrideCalls = [];
 let mockContext = createMockContext();
 
 beforeEach(() => {
-  metricOverrideCalls = [];
   contentSize = {width: 100, height: 100};
   screenSize = {width: 100, height: 100, dpr: 1};
   screenshotData = [];
   mockContext = createMockContext();
-  mockContext.driver.defaultSession.sendCommand.mockImplementation((method, args) => {
+  mockContext.driver.defaultSession.sendCommand.mockImplementation((method) => {
     if (method === 'Page.getLayoutMetrics') {
       return {
         contentSize,
@@ -45,9 +42,6 @@ beforeEach(() => {
       return {
         data: screenshotData?.length ? screenshotData.shift() : 'abc',
       };
-    }
-    if (method === 'Emulation.setDeviceMetricsOverride') {
-      metricOverrideCalls.push(args);
     }
   });
   mockContext.driver._executionContext.evaluate.mockImplementation(fn => {
@@ -83,6 +77,8 @@ describe('FullPageScreenshot gatherer', () => {
     mockContext.settings = {
       formFactor: 'mobile',
       screenEmulation: {
+        height: screenSize.height,
+        width: screenSize.width,
         mobile: true,
         disabled: false,
       },
@@ -107,6 +103,8 @@ describe('FullPageScreenshot gatherer', () => {
     mockContext.settings = {
       formFactor: 'mobile',
       screenEmulation: {
+        height: screenSize.height,
+        width: screenSize.width,
         mobile: true,
         disabled: false,
       },
@@ -114,20 +112,20 @@ describe('FullPageScreenshot gatherer', () => {
 
     await fpsGatherer.getArtifact(mockContext.asContext());
 
-    expect(metricOverrideCalls).toEqual([
-      {
-        deviceScaleFactor: 0,
-        height: 2000,
-        width: 0,
-        mobile: true,
-      },
-      {
-        deviceScaleFactor: 0,
+    const expectedArgs = {
+      formFactor: 'mobile',
+      screenEmulation: {
         height: 412,
-        width: 0,
+        width: 412,
+        disabled: false,
         mobile: true,
       },
-    ]);
+    };
+    expect(mocks.emulationMock.emulate).toHaveBeenCalledTimes(1);
+    expect(mocks.emulationMock.emulate).toHaveBeenCalledWith(
+      mockContext.driver.defaultSession,
+      expectedArgs
+    );
   });
 
   it('resets the emulation correctly when Lighthouse does not control it', async () => {
@@ -136,6 +134,9 @@ describe('FullPageScreenshot gatherer', () => {
     screenSize = {width: 500, height: 500, dpr: 2};
     mockContext.settings = {
       screenEmulation: {
+        height: screenSize.height,
+        width: screenSize.width,
+        mobile: true,
         disabled: true,
       },
       formFactor: 'mobile',
@@ -143,20 +144,27 @@ describe('FullPageScreenshot gatherer', () => {
 
     await fpsGatherer.getArtifact(mockContext.asContext());
 
-    expect(metricOverrideCalls).toEqual([
-      {
+    // Setting up for screenshot.
+    expect(mockContext.driver.defaultSession.sendCommand).toHaveBeenCalledWith(
+      'Emulation.setDeviceMetricsOverride',
+      expect.objectContaining({
+        mobile: true,
         deviceScaleFactor: 0,
         height: 1500,
         width: 0,
+      })
+    );
+
+    // Restoring.
+    expect(mockContext.driver.defaultSession.sendCommand).toHaveBeenCalledWith(
+      'Emulation.setDeviceMetricsOverride',
+      expect.objectContaining({
         mobile: true,
-      },
-      {
         deviceScaleFactor: 0,
         height: 500,
         width: 0,
-        mobile: true,
-      },
-    ]);
+      })
+    );
   });
 
   it('limits the screenshot height to the max Chrome can capture', async () => {
@@ -167,6 +175,8 @@ describe('FullPageScreenshot gatherer', () => {
     mockContext.settings = {
       formFactor: 'mobile',
       screenEmulation: {
+        height: screenSize.height,
+        width: screenSize.width,
         mobile: true,
         disabled: false,
       },
@@ -174,19 +184,14 @@ describe('FullPageScreenshot gatherer', () => {
 
     await fpsGatherer.getArtifact(mockContext.asContext());
 
-    expect(metricOverrideCalls).toEqual([
+    expect(mockContext.driver.defaultSession.sendCommand).toHaveBeenCalledWith(
+      'Emulation.setDeviceMetricsOverride',
       {
+        mobile: true,
         deviceScaleFactor: 0,
+        width: 0,
         height: maxTextureSizeMock,
-        width: 0,
-        mobile: true,
-      },
-      {
-        deviceScaleFactor: 0,
-        height: 412,
-        width: 0,
-        mobile: true,
-      },
-    ]);
+      }
+    );
   });
 });
