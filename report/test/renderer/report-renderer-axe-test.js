@@ -70,6 +70,26 @@ describe('ReportRendererAxe', () => {
         ],
       });
 
+      const axeSummary = axeResults.violations.map((v) => {
+        return {
+          id: v.id,
+          message: v.nodes.map((n) => n.failureSummary).join('\n'),
+        };
+      });
+      expect(axeSummary).toMatchInlineSnapshot(`
+Array [
+  Object {
+    "id": "duplicate-id",
+    "message": "Fix any of the following:
+  Document has multiple static elements with the same id attribute: viewport
+Fix any of the following:
+  Document has multiple static elements with the same id attribute: image-alt
+Fix any of the following:
+  Document has multiple static elements with the same id attribute: document-title",
+  },
+]
+`);
+
       expect(axeResults.violations).toMatchSnapshot();
     },
     // This test takes 10s on fast hardware, but can take longer in CI.
