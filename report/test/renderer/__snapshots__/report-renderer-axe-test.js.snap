@@ -1,6 +1,6 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`ReportRendererAxe with aXe renders without axe violations 1`] = `
+exports[`ReportRendererAxe with aXe renders without axe violations 2`] = `
 Array [
   Object {
     "description": "Ensures every id attribute value is unique",
