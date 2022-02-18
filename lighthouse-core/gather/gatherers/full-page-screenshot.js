@@ -102,7 +102,7 @@ class FullPageScreenshot extends FRGatherer {
       mobile: deviceMetrics.mobile,
       height,
       width: 0, // Don't change
-      deviceScaleFactor: 0, // Don't change
+      deviceScaleFactor: 1,
     });
 
     // Now that the viewport is taller, give the page some time to fetch new resources that
@@ -188,7 +188,7 @@ class FullPageScreenshot extends FRGatherer {
     /**
      * In case some other program is controlling emulation, remember what the device looks like now and reset after gatherer is done.
      * If we're gathering with mobile screenEmulation on (overlay scrollbars, etc), continue to use that for this screenshot.
-     * @type {{width: number, height: number, mobile: boolean}}
+     * @type {{width: number, height: number, deviceScaleFactor: number, mobile: boolean}}
      */
     const deviceMetrics = settings.screenEmulation;
     if (!lighthouseControlsEmulation) {
@@ -199,6 +199,7 @@ class FullPageScreenshot extends FRGatherer {
       });
       deviceMetrics.height = observedDeviceMetrics.height;
       deviceMetrics.width = observedDeviceMetrics.width;
+      deviceMetrics.deviceScaleFactor = observedDeviceMetrics.deviceScaleFactor;
       // If screen emulation is disabled, use formFactor to determine if we are on mobile.
       deviceMetrics.mobile = settings.formFactor === 'mobile';
     }
@@ -224,7 +225,7 @@ class FullPageScreenshot extends FRGatherer {
           mobile: deviceMetrics.mobile,
           height: deviceMetrics.height,
           width: 0, // Don't change
-          deviceScaleFactor: 0, // Don't change
+          deviceScaleFactor: deviceMetrics.deviceScaleFactor,
         });
       }
     }
