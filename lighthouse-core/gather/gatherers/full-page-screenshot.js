@@ -100,9 +100,9 @@ class FullPageScreenshot extends FRGatherer {
 
     await session.sendCommand('Emulation.setDeviceMetricsOverride', {
       mobile: deviceMetrics.mobile,
-      height,
-      width: 0, // Don't change
       deviceScaleFactor: 1,
+      height,
+      width: 0, // Leave width unchanged
     });
 
     // Now that the viewport is taller, give the page some time to fetch new resources that
@@ -223,9 +223,9 @@ class FullPageScreenshot extends FRGatherer {
         // https://github.com/GoogleChrome/lighthouse/issues/11122
         await session.sendCommand('Emulation.setDeviceMetricsOverride', {
           mobile: deviceMetrics.mobile,
-          height: deviceMetrics.height,
-          width: 0, // Don't change
           deviceScaleFactor: deviceMetrics.deviceScaleFactor,
+          height: deviceMetrics.height,
+          width: 0, // Leave width unchanged
         });
       }
     }
