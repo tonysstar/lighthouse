@@ -153,7 +153,7 @@ describe('FullPageScreenshot gatherer', () => {
       'Emulation.setDeviceMetricsOverride',
       expect.objectContaining({
         mobile: true,
-        deviceScaleFactor: 0,
+        deviceScaleFactor: 1,
         height: 1500,
         width: 0,
       })
@@ -164,7 +164,7 @@ describe('FullPageScreenshot gatherer', () => {
       'Emulation.setDeviceMetricsOverride',
       expect.objectContaining({
         mobile: true,
-        deviceScaleFactor: 0,
+        deviceScaleFactor: 2,
         height: 500,
         width: 0,
       })
@@ -192,7 +192,7 @@ describe('FullPageScreenshot gatherer', () => {
       'Emulation.setDeviceMetricsOverride',
       {
         mobile: true,
-        deviceScaleFactor: 0,
+        deviceScaleFactor: 1,
         width: 0,
         height: maxTextureSizeMock,
       }
