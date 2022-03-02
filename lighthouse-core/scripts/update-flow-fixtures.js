@@ -135,6 +135,7 @@ async function generateFlowResult() {
     await generateFlowResult();
   } catch (err) {
     console.error(err);
+    process.exit(1);
   }
 })();
 
