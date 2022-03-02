@@ -10,11 +10,11 @@ const {snapshotGather} = require('./gather/snapshot-runner.js');
 const {startTimespanGather} = require('./gather/timespan-runner.js');
 const {navigationGather} = require('./gather/navigation-runner.js');
 const Runner = require('../runner.js');
+const {initializeConfig} = require('./config/config.js');
 
 /** @typedef {Parameters<snapshotGather>[0]} FrOptions */
 /** @typedef {Omit<FrOptions, 'page'> & {name?: string}} UserFlowOptions */
 /** @typedef {Omit<FrOptions, 'page'> & {stepName?: string}} StepOptions */
-/** @typedef {{gatherResult: LH.Gatherer.FRGatherResult, name: string}} StepArtifact */
 
 class UserFlow {
   /**
@@ -26,8 +26,8 @@ class UserFlow {
     this.options = {page, ...options};
     /** @type {string|undefined} */
     this.name = options?.name;
-    /** @type {StepArtifact[]} */
-    this.stepArtifacts = [];
+    /** @type {LH.UserFlow.ActiveGatherStep[]} */
+    this._gatherSteps = [];
   }
 
   /**
@@ -68,8 +68,8 @@ class UserFlow {
     }
 
     // On repeat navigations, we want to disable storage reset by default (i.e. it's not a cold load).
-    const isSubsequentNavigation = this.stepArtifacts
-      .some(step => step.gatherResult.artifacts.GatherContext.gatherMode === 'navigation');
+    const isSubsequentNavigation = this._gatherSteps
+      .some(step => step.artifacts.GatherContext.gatherMode === 'navigation');
     if (isSubsequentNavigation) {
       if (settingsOverrides.disableStorageReset === undefined) {
         settingsOverrides.disableStorageReset = true;
@@ -89,15 +89,15 @@ class UserFlow {
   async navigate(requestor, stepOptions) {
     if (this.currentTimespan) throw new Error('Timespan already in progress');
 
-    const gatherResult = await navigationGather(
-      requestor,
-      this._getNextNavigationOptions(stepOptions)
-    );
+    const options = this._getNextNavigationOptions(stepOptions);
+    const gatherResult = await navigationGather(requestor, options);
 
     const providedName = stepOptions?.stepName;
-    this.stepArtifacts.push({
-      gatherResult,
+    this._gatherSteps.push({
+      ...gatherResult,
       name: providedName || this._getDefaultStepName(gatherResult.artifacts),
+      config: options.config,
+      configContext: options.configContext,
     });
 
     return gatherResult;
@@ -122,9 +122,11 @@ class UserFlow {
     this.currentTimespan = undefined;
 
     const providedName = options?.stepName;
-    this.stepArtifacts.push({
-      gatherResult,
+    this._gatherSteps.push({
+      ...gatherResult,
       name: providedName || this._getDefaultStepName(gatherResult.artifacts),
+      config: options.config,
+      configContext: options.configContext,
     });
 
     return gatherResult;
@@ -140,9 +142,11 @@ class UserFlow {
     const gatherResult = await snapshotGather(options);
 
     const providedName = stepOptions?.stepName;
-    this.stepArtifacts.push({
-      gatherResult,
+    this._gatherSteps.push({
+      ...gatherResult,
       name: providedName || this._getDefaultStepName(gatherResult.artifacts),
+      config: options.config,
+      configContext: options.configContext,
     });
 
     return gatherResult;
@@ -152,21 +156,7 @@ class UserFlow {
    * @returns {Promise<LH.FlowResult>}
    */
   async createFlowResult() {
-    if (!this.stepArtifacts.length) {
-      throw new Error('Need at least one step before getting the result');
-    }
-    const url = new URL(this.stepArtifacts[0].gatherResult.artifacts.URL.finalUrl);
-    const flowName = this.name || `User flow (${url.hostname})`;
-
-    /** @type {LH.FlowResult['steps']} */
-    const steps = [];
-    for (const {gatherResult, name} of this.stepArtifacts) {
-      const result = await Runner.audit(gatherResult.artifacts, gatherResult.runnerOptions);
-      if (!result) throw new Error(`Step "${name}" did not return a result`);
-      steps.push({lhr: result.lhr, name});
-    }
-
-    return {steps, name: flowName};
+    return auditGatherSteps(this._gatherSteps, this.name, this.options.config);
   }
 
   /**
@@ -176,6 +166,69 @@ class UserFlow {
     const flowResult = await this.createFlowResult();
     return generateFlowReportHtml(flowResult);
   }
+
+  /**
+   * @return {LH.UserFlow.FlowArtifacts}
+   */
+  createArtifactsJson() {
+    /** @type {LH.UserFlow.GatherStep[]} */
+    const stepArtifacts = this._gatherSteps.map(step => ({
+      name: step.name,
+      artifacts: step.artifacts,
+      config: step.config,
+      configContext: step.configContext,
+    }));
+
+    return {
+      gatherSteps: stepArtifacts,
+      name: this.name,
+    };
+  }
 }
 
-module.exports = UserFlow;
+/**
+ * @param {Array<LH.UserFlow.GatherStep | LH.UserFlow.ActiveGatherStep>} gatherSteps
+ * @param {string|undefined} name
+ * @param {LH.Config.Json|undefined} flowConfig Must be the same as the config provided when the flow started.
+ */
+async function auditGatherSteps(gatherSteps, name, flowConfig) {
+  if (!gatherSteps.length) {
+    throw new Error('Need at least one step before getting the result');
+  }
+
+  /** @type {LH.FlowResult['steps']} */
+  const steps = [];
+  for (const gatherStep of gatherSteps) {
+    const {artifacts, name, configContext} = gatherStep;
+
+    let runnerOptions;
+    if ('runnerOptions' in gatherStep) {
+      // If the gather step is active, we can access the runner options directly.
+      runnerOptions = gatherStep.runnerOptions;
+    } else {
+      // If the gather step is not active, we must recreate the runner options.
+      // Step specific configs take precedence over a config for the entire flow.
+      const configJson = gatherStep.config || flowConfig;
+      const {gatherMode} = artifacts.GatherContext;
+      const {config} = initializeConfig(configJson, {...configContext, gatherMode});
+      runnerOptions = {
+        config,
+        computedCache: new Map(),
+      };
+    }
+
+    const result = await Runner.audit(artifacts, runnerOptions);
+    if (!result) throw new Error(`Step "${name}" did not return a result`);
+    steps.push({lhr: result.lhr, name});
+  }
+
+  const url = new URL(gatherSteps[0].artifacts.URL.finalUrl);
+  const flowName = name || `User flow (${url.hostname})`;
+  return {steps, name: flowName};
+}
+
+
+module.exports = {
+  UserFlow,
+  auditGatherSteps,
+};
