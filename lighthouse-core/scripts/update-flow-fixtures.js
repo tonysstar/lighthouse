@@ -14,6 +14,7 @@ import puppeteer from 'puppeteer';
 
 import {LH_ROOT} from '../../root.js';
 import api from '../fraggle-rock/api.js';
+import assetSaver from '../lib/asset-saver.js';
 
 const ARTIFACTS_PATH =
   `${LH_ROOT}/lighthouse-core/test/fixtures/fraggle-rock/artifacts/sample-flow-artifacts.json`;
@@ -48,19 +49,6 @@ async function waitForImagesToLoad(page) {
     const secondRunImages = await getImageLoadingStates();
     assert.deepStrictEqual(secondRunImages, firstRunImages);
   }, TIMEOUT);
-}
-
-/**
- * @param {LH.Result.MeasureEntry[]} timings
- */
-function normalizeTimingEntries(timings) {
-  let baseTime = 0;
-  for (const timing of timings) {
-    // @ts-expect-error: Value actually is writeable at this point.
-    timing.startTime = baseTime++;
-    // @ts-expect-error: Value actually is writeable at this point.
-    timing.duration = 1;
-  }
 }
 
 /** @type {LH.Config.Json} */
@@ -101,7 +89,7 @@ async function rebaselineArtifacts() {
 
   // Normalize some data so it doesn't change on every update.
   for (const {artifacts} of flowArtifacts.gatherSteps) {
-    normalizeTimingEntries(artifacts.Timing);
+    assetSaver.normalizeTimingEntries(artifacts.Timing);
   }
 
   fs.writeFileSync(ARTIFACTS_PATH, JSON.stringify(flowArtifacts, null, 2));
@@ -114,7 +102,7 @@ async function generateFlowResult() {
 
   // Normalize some data so it doesn't change on every update.
   for (const {lhr} of flowResult.steps) {
-    normalizeTimingEntries(lhr.timing.entries);
+    assetSaver.normalizeTimingEntries(lhr.timing.entries);
     lhr.timing.total = lhr.timing.entries.length;
   }
 
