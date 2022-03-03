@@ -320,7 +320,7 @@ describe('UserFlow', () => {
         },
       ];
 
-      const flowResult = await auditGatherSteps(gatherSteps, undefined, flowConfig);
+      const flowResult = await auditGatherSteps(gatherSteps, {config: flowConfig});
 
       expect(mockRunner.audit.mock.calls).toMatchObject([
         [

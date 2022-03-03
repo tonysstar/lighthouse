@@ -15,6 +15,7 @@ const {initializeConfig} = require('./config/config.js');
 /** @typedef {Parameters<snapshotGather>[0]} FrOptions */
 /** @typedef {Omit<FrOptions, 'page'> & {name?: string}} UserFlowOptions */
 /** @typedef {Omit<FrOptions, 'page'> & {stepName?: string}} StepOptions */
+/** @typedef {WeakMap<LH.UserFlow.GatherStep, LH.Gatherer.FRGatherResult['runnerOptions']>} GatherStepRunnerOptions */
 
 class UserFlow {
   /**
@@ -28,6 +29,8 @@ class UserFlow {
     this.name = options?.name;
     /** @type {LH.UserFlow.GatherStep[]} */
     this._gatherSteps = [];
+    /** @type {GatherStepRunnerOptions} */
+    this._gatherStepRunnerOptions = new WeakMap();
   }
 
   /**
@@ -83,6 +86,23 @@ class UserFlow {
   }
 
   /**
+   *
+   * @param {LH.Gatherer.FRGatherResult} gatherResult
+   * @param {StepOptions} options
+   */
+  _addGatherStep(gatherResult, options) {
+    const providedName = options?.stepName;
+    const gatherStep = {
+      artifacts: gatherResult.artifacts,
+      name: providedName || this._getDefaultStepName(gatherResult.artifacts),
+      config: options.config,
+      configContext: options.configContext,
+    };
+    this._gatherSteps.push(gatherStep);
+    this._gatherStepRunnerOptions.set(gatherStep, gatherResult.runnerOptions);
+  }
+
+  /**
    * @param {LH.NavigationRequestor} requestor
    * @param {StepOptions=} stepOptions
    */
@@ -92,14 +112,7 @@ class UserFlow {
     const options = this._getNextNavigationOptions(stepOptions);
     const gatherResult = await navigationGather(requestor, options);
 
-    const providedName = stepOptions?.stepName;
-    this._gatherSteps.push({
-      artifacts: gatherResult.artifacts,
-      activeRunnerOptions: gatherResult.runnerOptions,
-      name: providedName || this._getDefaultStepName(gatherResult.artifacts),
-      config: options.config,
-      configContext: options.configContext,
-    });
+    this._addGatherStep(gatherResult, options);
 
     return gatherResult;
   }
@@ -122,14 +135,7 @@ class UserFlow {
     const gatherResult = await timespan.endTimespanGather();
     this.currentTimespan = undefined;
 
-    const providedName = options?.stepName;
-    this._gatherSteps.push({
-      artifacts: gatherResult.artifacts,
-      activeRunnerOptions: gatherResult.runnerOptions,
-      name: providedName || this._getDefaultStepName(gatherResult.artifacts),
-      config: options.config,
-      configContext: options.configContext,
-    });
+    this._addGatherStep(gatherResult, options);
 
     return gatherResult;
   }
@@ -143,14 +149,7 @@ class UserFlow {
     const options = {...this.options, ...stepOptions};
     const gatherResult = await snapshotGather(options);
 
-    const providedName = stepOptions?.stepName;
-    this._gatherSteps.push({
-      artifacts: gatherResult.artifacts,
-      activeRunnerOptions: gatherResult.runnerOptions,
-      name: providedName || this._getDefaultStepName(gatherResult.artifacts),
-      config: options.config,
-      configContext: options.configContext,
-    });
+    this._addGatherStep(gatherResult, options);
 
     return gatherResult;
   }
@@ -159,7 +158,11 @@ class UserFlow {
    * @returns {Promise<LH.FlowResult>}
    */
   async createFlowResult() {
-    return auditGatherSteps(this._gatherSteps, this.name, this.options.config);
+    return auditGatherSteps(this._gatherSteps, {
+      name: this.name,
+      config: this.options.config,
+      gatherStepRunnerOptions: this._gatherStepRunnerOptions,
+    });
   }
 
   /**
@@ -174,19 +177,8 @@ class UserFlow {
    * @return {LH.UserFlow.FlowArtifacts}
    */
   createArtifactsJson() {
-    /**
-     * Remap so `activeRunnerOptions` is not returned on the JSON object.
-     * @type {LH.UserFlow.GatherStep[]}
-     */
-    const stepArtifacts = this._gatherSteps.map(step => ({
-      name: step.name,
-      artifacts: step.artifacts,
-      config: step.config,
-      configContext: step.configContext,
-    }));
-
     return {
-      gatherSteps: stepArtifacts,
+      gatherSteps: this._gatherSteps,
       name: this.name,
     };
   }
@@ -194,10 +186,9 @@ class UserFlow {
 
 /**
  * @param {Array<LH.UserFlow.GatherStep>} gatherSteps
- * @param {string|undefined} name
- * @param {LH.Config.Json|undefined} flowConfig Must be the same as the config provided when the flow started.
+ * @param {{name?: string, config?: LH.Config.Json, gatherStepRunnerOptions?: GatherStepRunnerOptions}} options
  */
-async function auditGatherSteps(gatherSteps, name, flowConfig) {
+async function auditGatherSteps(gatherSteps, options) {
   if (!gatherSteps.length) {
     throw new Error('Need at least one step before getting the result');
   }
@@ -207,14 +198,12 @@ async function auditGatherSteps(gatherSteps, name, flowConfig) {
   for (const gatherStep of gatherSteps) {
     const {artifacts, name, configContext} = gatherStep;
 
-    let runnerOptions;
-    if (gatherStep.activeRunnerOptions) {
-      // If the gather step is active, we can access the runner options directly.
-      runnerOptions = gatherStep.activeRunnerOptions;
-    } else {
-      // If the gather step is not active, we must recreate the runner options.
+    let runnerOptions = options.gatherStepRunnerOptions?.get(gatherStep);
+
+    // If the gather step is not active, we must recreate the runner options.
+    if (!runnerOptions) {
       // Step specific configs take precedence over a config for the entire flow.
-      const configJson = gatherStep.config || flowConfig;
+      const configJson = gatherStep.config || options.config;
       const {gatherMode} = artifacts.GatherContext;
       const {config} = initializeConfig(configJson, {...configContext, gatherMode});
       runnerOptions = {
@@ -229,7 +218,7 @@ async function auditGatherSteps(gatherSteps, name, flowConfig) {
   }
 
   const url = new URL(gatherSteps[0].artifacts.URL.finalUrl);
-  const flowName = name || `User flow (${url.hostname})`;
+  const flowName = options.name || `User flow (${url.hostname})`;
   return {steps, name: flowName};
 }
 

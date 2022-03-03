@@ -11,7 +11,6 @@ declare module UserFlow {
     name: string;
     config?: LH.Config.Json;
     configContext?: LH.Config.FRContext;
-    activeRunnerOptions?: LH.Gatherer.FRGatherResult['runnerOptions'];
   }
 }
 

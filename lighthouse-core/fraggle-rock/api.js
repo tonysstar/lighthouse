@@ -63,8 +63,8 @@ async function generateFlowReport(flowResult) {
  * @param {LH.Config.Json} [config]
  */
 async function auditFlowArtifacts(flowArtifacts, config) {
-  const {gatherSteps} = flowArtifacts;
-  return await auditGatherSteps(gatherSteps, flowArtifacts.name, config);
+  const {gatherSteps, name} = flowArtifacts;
+  return await auditGatherSteps(gatherSteps, {name, config});
 }
 
 module.exports = {
