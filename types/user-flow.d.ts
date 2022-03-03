@@ -11,14 +11,7 @@ declare module UserFlow {
     name: string;
     config?: LH.Config.Json;
     configContext?: LH.Config.FRContext;
-  }
-
-  /**
-   * The LH runner options are not JSON serializable, so they will not be available if we are auditing user flow artifacts from disk.
-   * If we are not auditing artifacts from disk, `ActiveGatherStep` contains a `runnerOptions` property for us to access the options directly.
-   */
-  export interface ActiveGatherStep extends GatherStep {
-    runnerOptions: LH.Gatherer.FRGatherResult['runnerOptions'];
+    activeRunnerOptions?: LH.Gatherer.FRGatherResult['runnerOptions'];
   }
 }
 
